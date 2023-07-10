@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { nanoid } from 'nanoid';
 
 import { ContactForm } from 'components/ContactForm';
@@ -9,107 +9,87 @@ import { Container, Title, FormModal } from './App.styled';
 
 const LS_KEY = 'contacts';
 
-export class App extends Component {
-  state = {
-    contacts: [],
-    filter: '',
-    isModalShown: false,
-  };
+export const App = () => {
+  const [contacts, setContacts] = useState([]);
+  const [filter, setFilter] = useState('');
+  const [isModalShown, setIsModalShown] = useState(false);
 
-  componentDidMount = () => {
-    const contacts = JSON.parse(localStorage.getItem(LS_KEY));
+  const isFirstMount = useRef(true);
 
-    if (contacts) {
-      this.setState({ contacts });
+  useEffect(() => {
+    const contactsFromLS = JSON.parse(localStorage.getItem(LS_KEY));
+
+    if (contactsFromLS) {
+      setContacts(contactsFromLS);
     }
-  };
+  }, []);
 
-  componentDidUpdate(_, prevState) {
-    const prevContacts = prevState.contacts;
-    const nextContacts = this.state.contacts;
-
-    if (prevContacts !== nextContacts) {
-      localStorage.setItem(LS_KEY, JSON.stringify(nextContacts));
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
     }
-  }
 
-  getFilteredValue = filterValue => {
-    this.setState({ filter: filterValue });
-  };
+    localStorage.setItem(LS_KEY, JSON.stringify(contacts));
+  }, [contacts]);
 
-  getFilteredContacts = () => {
-    const { contacts, filter } = this.state;
+  const getFilteredContacts = () =>
+    contacts.filter(({ name }) => name.toLowerCase().includes(filter));
 
-    return contacts.filter(({ name }) => name.toLowerCase().includes(filter));
-  };
+  const findContactByName = nameValue =>
+    contacts.find(({ name }) => name === nameValue);
 
-  findContactByName = nameValue => {
-    return this.state.contacts.find(({ name }) => name === nameValue);
-  };
+  const findContactByNumber = numberValue =>
+    contacts.find(({ number }) => numberValue === number);
 
-  findContactByNumber = numberValue => {
-    return this.state.contacts.find(({ number }) => numberValue === number);
-  };
-
-  addContact = data => {
+  const addContact = data => {
     const id = nanoid();
+    setContacts(state => [...state, { ...data, id }]);
 
-    this.setState(({ contacts }) => ({
-      contacts: [...contacts, { ...data, id }],
-    }));
-
-    this.toggleModal();
+    toggleModal();
   };
 
-  editContact = data => {
-    this.setState(({ contacts }) => ({
-      contacts: contacts.map(item => (item.id === data.id ? data : item)),
-    }));
-  };
-
-  removeContact = idValue => {
-    this.setState(({ contacts }) => ({
-      contacts: contacts.filter(({ id }) => id !== idValue),
-    }));
-  };
-
-  toggleModal = () => {
-    this.setState(({ isModalShown }) => ({ isModalShown: !isModalShown }));
-  };
-
-  render() {
-    const { isModalShown } = this.state;
-    const contacts = this.getFilteredContacts();
-
-    return (
-      <Container>
-        <Title>Phonebook</Title>
-        <div>
-          <Controlls
-            getFilteredValue={this.getFilteredValue}
-            toggleModal={this.toggleModal}
-          />
-
-          {isModalShown && (
-            <FormModal onClose={this.toggleModal}>
-              <ContactForm
-                handleContactChange={this.addContact}
-                findContactByName={this.findContactByName}
-                findContactByNumber={this.findContactByNumber}
-              />
-            </FormModal>
-          )}
-          {contacts.length ? (
-            <ContactList
-              removeContact={this.removeContact}
-              contacts={contacts}
-              editContact={this.editContact}
-            />
-          ) : (
-            <Message text="There are no contacts here" />
-          )}
-        </div>
-      </Container>
+  const editContact = data => {
+    setContacts(state =>
+      state.map(item => (item.id === data.id ? data : item))
     );
-  }
-}
+  };
+
+  const removeContact = idValue => {
+    setContacts(state => state.filter(({ id }) => id !== idValue));
+  };
+
+  const toggleModal = () => {
+    setIsModalShown(state => !state);
+  };
+
+  const contactsToShow = getFilteredContacts();
+
+  return (
+    <Container>
+      <Title>Phonebook</Title>
+      <div>
+        <Controlls getFilteredValue={setFilter} toggleModal={toggleModal} />
+
+        {isModalShown && (
+          <FormModal onClose={toggleModal}>
+            <ContactForm
+              handleContactChange={addContact}
+              findContactByName={findContactByName}
+              findContactByNumber={findContactByNumber}
+            />
+          </FormModal>
+        )}
+        {contactsToShow.length ? (
+          <ContactList
+            removeContact={removeContact}
+            contacts={contactsToShow}
+            editContact={editContact}
+          />
+        ) : (
+          <Message text="There are no contacts here" />
+        )}
+      </div>
+    </Container>
+  );
+};
